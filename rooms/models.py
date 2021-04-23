@@ -28,6 +28,8 @@ class Room(models.Model):
     def __str__(self):
         return self.name
 
+    class Meta:
+        ordering = ['created_at']
 
 class RoomImage(models.Model):
     image = models.ImageField(upload_to='rooms', blank=True, null=True)

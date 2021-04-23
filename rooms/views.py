@@ -3,7 +3,9 @@ from rest_framework import generics, viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .serializers import RoomSerializer, RoomImageSerializer, RatingSerializer, ReviewSerializer
+
+from reservation.serializers import GuestSerializer
+from .serializers import RoomSerializer, RoomImageSerializer, RatingSerializer, ReviewSerializer, HostSerializer
 from django.utils import timezone
 from rooms.models import Room, RoomImage, Rating
 from datetime import timedelta
@@ -48,7 +50,10 @@ class RoomsViewSet(viewsets.ModelViewSet):
         queryset = self.get_queryset()
         queryset = queryset.filter(user=request.user)
 
+
 '''COMMENT POST --- POST, [text]'''
+
+
 class AddReviewView(generics.CreateAPIView):
     serializer_class = ReviewSerializer
     permission_classes = (permissions.IsAuthenticatedOrReadOnly,)
@@ -65,16 +70,6 @@ class AddReviewView(generics.CreateAPIView):
                 serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-
-'''CHANGE commentT --- GET, PATCH, DELETE '''
-# class ManageCommentView(generics.RetrieveUpdateDestroyAPIView):
-#     serializer_class = CommentSerializer
-#     lookup_url_kwarg = 'comment_id'
-#     permission_classes = (IsOwnerOrPostOwnerOrReadOnly,)
-#
-#     def get_queryset(self):
-#         queryset = Comment.objects.all()
-#         return queryset
 class RatingViewSet(generics.CreateAPIView):
     serializer_class = RatingSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly, ]
@@ -99,6 +94,7 @@ class RatingViewSet(generics.CreateAPIView):
 
 class LikeView(APIView):
     permission_classes = (permissions.IsAuthenticatedOrReadOnly,)
+
     def get(self, request, format=None, id=None):
         room = Room.objects.get(pk=id)
         user = self.request.user
@@ -113,6 +109,54 @@ class LikeView(APIView):
             'like': like
         }
         return Response(data)
+
+
+'''GET THE LIST OF SAVED ROOMS --- GET '''
+
+
+class UserSavedView(generics.ListAPIView):
+    serializer_class = RoomSerializer
+    permission_classes = (permissions.IsAuthenticatedOrReadOnly,)
+
+    def get_queryset(self):
+        user = self.request.user
+        favorited = user.favs.all()
+        queryset = Room.objects.all().filter(pk__in=favorited)
+        return queryset
+
+
+class SaveView(APIView):
+    permission_classes = (permissions.IsAuthenticatedOrReadOnly,)
+
+    def get(self, request, format=None, id=None):
+        room = Room.objects.get(pk=id)
+        user = self.request.user
+        if user.is_authenticated:
+            if user in room.favs.all():
+                favorite = False
+                room.favs.remove(user)
+            else:
+                favorite = True
+                room.favs.add(user)
+            data = {
+                'saved': favorite
+            }
+            return Response(data)
+
+
+'''GET THE LIST OF FAVORITERS --- GET '''
+
+class GetSaversView(generics.ListAPIView):
+    serializer_class = HostSerializer
+    pagination_class = CommentPagination
+    permission_classes = (permissions.AllowAny,)
+
+    def get_queryset(self):
+        post_id = self.kwargs['id']
+        queryset = Room.objects.get(
+            pk=post_id).favs.all()
+        return queryset
+
 
 class RoomImageView(generics.ListCreateAPIView):
     queryset = RoomImage.objects.all()

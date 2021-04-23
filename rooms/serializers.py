@@ -30,11 +30,12 @@ class RoomSerializer(serializers.ModelSerializer):
     rating = serializers.SerializerMethodField('paginated_room_ratings')
     number_of_reviews = serializers.SerializerMethodField()
     room_reviews = serializers.SerializerMethodField('paginated_room_reviews')
+    saved_by_req_user = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
         fields = ('id', 'host', 'name', 'address', 'city', 'price', 'beds', 'bedrooms', 'bathrooms', 'created_at', 'is_available', 'number_of_likes','liked_by_req_user', 'number_of_reviews',
-                  'room_reviews', 'rated_by_req_user', 'average_rating', 'rating')
+                  'room_reviews', 'rated_by_req_user', 'average_rating', 'rating', 'saved_by_req_user')
 
 
     def get_number_of_reviews(self, obj):
@@ -74,12 +75,15 @@ class RoomSerializer(serializers.ModelSerializer):
 
     def get_rated_by_req_user(self, obj):
         user = self.context['request'].user
-        print(obj)
         rating = Rating.objects.filter(room=obj, user=user)
         if rating:
             return True
         else:
             return False
+
+    def get_saved_by_req_user(self, obj):
+        user = self.context['request'].user
+        return user in obj.favs.all()
 
 
 class RatingSerializer(serializers.ModelSerializer):
@@ -91,7 +95,6 @@ class RatingSerializer(serializers.ModelSerializer):
 
     def validate_user(self, obj):
         user = self.context['request'].user
-        print(user)
         if user in obj.ratings:
             raise serializers.ValidationError('You have already rated the post')
         return obj

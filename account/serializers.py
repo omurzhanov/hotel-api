@@ -28,6 +28,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
         if password != password_confirmation:
             raise serializers.ValidationError('Passwords do not match')
         return attrs
+
     def validate_superhost(self, superhost):
         return superhost
 
@@ -40,11 +41,12 @@ class RegistrationSerializer(serializers.ModelSerializer):
         send_activation_code(email=email, activation_code=user.activation_code)
         return user
 
+
 class CustomLoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(
         label=('password'),
-        style={'input_type':'password'},
+        style={'input_type': 'password'},
         trim_whitespace=False
     )
 
@@ -68,3 +70,42 @@ class CustomLoginSerializer(serializers.Serializer):
 
         attrs['user'] = user
         return attrs
+
+
+class CreateNewPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    activation_code = serializers.CharField(max_length=60)
+    password = serializers.CharField(min_length=6, required=True)
+    password_confirm = serializers.CharField(min_length=6, required=True)
+
+    def validate_email(self, email):
+        if not MyUser.objects.filter(email=email).exists():
+            raise serializers.ValidationError('User with given email does not exist')
+        return email
+
+    def validate_activation_code(self, activation_code):
+        if not MyUser.objects.filter(activation_code=activation_code, is_active=False).exists():
+            raise serializers.ValidationError('Wrong activation code')
+        return activation_code
+
+    def validate(self, attrs):
+        password = attrs.get('password')
+        password_confirmation = attrs.get('password_confirm')
+        if password != password_confirmation:
+            raise serializers.ValidationError('Passwords do not match')
+        return attrs
+
+    def save(self, **kwargs):
+        data = self.validated_data
+        email = data.get('email')
+        activation_code = data.get('activation_code')
+        password = data.get('password')
+        try:
+            user = MyUser.objects.get(email=email, activation_code=activation_code, is_active=False)
+        except:
+            raise serializers.ValidationError('User not found')
+        user.is_active = True
+        user.activation_code = ''
+        user.set_password(password)
+        user.save()
+        return user
